@@ -43,6 +43,7 @@ class Settings {
                 $purchased_page_field,
                 $exclusive_content_page_field,
                 $blog_tab,
+                $sponsorship_purchase_redirect_page_field,
                 $appeal_text_field,
                 $complaints_text_field,
                 $categories_tab,
@@ -219,6 +220,22 @@ class Settings {
             'endpoint' => 0,
             'selected' => 0,
         ];
+        $sponsorship_purchase_redirect_page_field = [
+            'key' => 'field_68c34b1f0a1c1',
+            'label' => __('Sponsorships after purchase redirect to', APP_THEME_DOMAIN),
+            'name' => 'sponsorship_purchase_redirect_page',
+            'aria-label' => '',
+            'type' => 'post_object',
+            'post_type' => ['page'],
+            'return_format' => 'id',
+            'allow_null' => 1,
+            'wpml_cf_preferences' => 1,
+            'wrapper' => [
+                'width' => '100%',
+                'class' => '',
+                'id' => '',
+            ],
+        ];
         $appeal_text_field = [
             'key' => 'field_67aa491241f4c',
             'label' => __('Appeals text', APP_THEME_DOMAIN),
@@ -229,7 +246,7 @@ class Settings {
             'required' => 0,
             'conditional_logic' => 0,
             'wrapper' => [
-                'width' => '',
+                'width' => '50%',
                 'class' => '',
                 'id' => '',
             ],
@@ -251,7 +268,7 @@ class Settings {
             'required' => 0,
             'conditional_logic' => 0,
             'wrapper' => [
-                'width' => '',
+                'width' => '50%',
                 'class' => '',
                 'id' => '',
             ],
@@ -265,6 +282,7 @@ class Settings {
         ];
         return array(
             'blog_tab' => $blog_tab,
+            'sponsorship_purchase_redirect_page_field' => $sponsorship_purchase_redirect_page_field,
             'appeal_text_field' => $appeal_text_field,
             'complaints_text_field' => $complaints_text_field,
         );
