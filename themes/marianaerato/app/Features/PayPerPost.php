@@ -21,6 +21,7 @@ trait PayPerPost
 
         return get_posts($args);
     }
+
     public function get_product_linked_to_post($post_id): array
     {
         $args = [
@@ -42,7 +43,7 @@ trait PayPerPost
     public function get_product_permalink_by_lang($product_id): string
     {
         $linked_products = $this->get_posts_linked_to_product($product_id);
-        $linked_post_id = reset($linked_products)->ID;
+        $linked_post_id = count($linked_products) > 1 ? reset($linked_products)->ID : $product_id;
 
         $lang = apply_filters('wpml_current_language', null);
 
