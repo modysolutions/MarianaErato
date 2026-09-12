@@ -181,6 +181,8 @@ class Settings {
             'post_type' => [
                 0 => 'page',
             ],
+            'return_format' => 'id',
+            'allow_null' => 1,
         ];
         $exclusive_content_page_field = [
             'key' => 'field_2938474395',
@@ -192,6 +194,8 @@ class Settings {
             'post_type' => [
                 0 => 'page',
             ],
+            'return_format' => 'id',
+            'allow_null' => 1,
         ];
         return array(
             'pages_tab' => $pages_tab,
