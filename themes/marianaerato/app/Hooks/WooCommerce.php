@@ -32,6 +32,18 @@ class WooCommerce {
             [$this, 'woocommerce_get_checkout_order_received_url'], 10, 2);
         add_filter('woocommerce_add_to_cart_redirect', [$this, 'woocommerce_add_to_cart_redirect']);
         add_filter('woocommerce_get_checkout_url', [$this, 'woocommerce_get_checkout_url']);
+
+        add_filter('woocommerce_email_enabled_new_order',                 [$this, 'suppress_access_order_email'], 10, 2);
+        add_filter('woocommerce_email_enabled_customer_processing_order', [$this, 'suppress_access_order_email'], 10, 2);
+        add_filter('woocommerce_email_enabled_customer_completed_order',  [$this, 'suppress_access_order_email'], 10, 2);
+        add_filter('woocommerce_email_enabled_customer_invoice',          [$this, 'suppress_access_order_email'], 10, 2);
+    }
+
+    public function suppress_access_order_email(bool $enabled, $order): bool {
+        if ($order instanceof \WC_Order && $order->get_meta('_mm_sponsorship_access_order') === 'yes') {
+            return false;
+        }
+        return $enabled;
     }
 
     public function template_redirect(): void {
@@ -122,11 +134,17 @@ class WooCommerce {
             return;
         }
 
+        if ($order->get_meta('_mm_sponsorship_processed') === 'yes') {
+            return;
+        }
+
         $items = $order->get_items();
         $product_id = reset($items)->get_product_id();
         $sponsorship_product_category = get_field('subscription_sponsorship_product_category', 'option');
         $this->order = $order;
         if ($sponsorship_product_category && has_term($sponsorship_product_category, 'product_cat', $product_id)) {
+            $order->update_meta_data('_mm_sponsorship_processed', 'yes');
+            $order->save();
             $this->assign_sponsorship_to_user($order->get_user_id(), $product_id);
         }
     }
@@ -266,6 +284,8 @@ class WooCommerce {
         $new_order->set_discount_tax(0);
         $new_order->set_cart_tax(0);
         $new_order->set_total(0);
+        $new_order->update_meta_data('_mm_sponsorship_access_order', 'yes');
+        $new_order->update_meta_data('_mm_sponsorship_source_order_id', $this->order->get_id());
         $new_order->update_status(OrderStatus::COMPLETED, __('Manual 100% discount order.'));
         $new_order->save();
     }

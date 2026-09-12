@@ -86,7 +86,7 @@ $css_file->enqueue();
     else:
         $product_template = get_field('pay_per_post_product_template', 'option');
         if ($product_template && did_action('elementor/loaded')) {
-//            echo Plugin::instance()->frontend->get_builder_content_for_display($product_template);
+            echo Plugin::instance()->frontend->get_builder_content_for_display($product_template);
         }?>
     <?php
     endif;
