@@ -1,94 +1,132 @@
 <?php
 
 /** @noinspection PhpUndefinedVariableInspection */
-//Sort by last purchase date
-//usort($purchased, fn($a, $b) => strcmp($a->last_purchase_date, $b->last_purchase_date));
 
+use Elementor\Core\Files\CSS\Post as ElementorCssPost;
+use Elementor\Plugin as ElementorPlugin;
 
-// Purchased
-use Elementor\Core\Files\CSS\Post;
-use Elementor\Plugin;
+$lang = apply_filters('wpml_current_language', null);
+$private_gallery_post_tag = (int) apply_filters(
+    'wpml_object_id',
+    (int) get_field('private_gallery_post_tag', 'option'),
+    'post_tag',
+    true,
+    $lang
+);
+$bts_post_tag = (int) apply_filters(
+    'wpml_object_id',
+    (int) get_field('bts_post_tag', 'option'),
+    'post_tag',
+    true,
+    $lang
+);
+$purchased_page_id = (int) apply_filters(
+    'wpml_object_id',
+    (int) get_field('field_purchased_page', 'option'),
+    'page',
+    true,
+    $lang
+);
+$exclusive_page_id = (int) apply_filters(
+    'wpml_object_id',
+    (int) get_field('field_exclusive_content_page', 'option'),
+    'page',
+    true,
+    $lang
+);
 
-$private_gallery_post_tag = get_field('private_gallery_post_tag', 'option');
-$bts_post_tag = get_field('bts_post_tag', 'option');
-$field_purchased_page = get_field('field_purchased_page', 'option', false);
-$field_exclusive_content_page = get_field('field_exclusive_content_page', 'option', false);
-$css_file = new Post($template_id ?? null);
-$css_file->enqueue();
+$page_id = get_the_ID();
+
+$granted_post_ids = is_user_logged_in()
+    ? get_user_meta(get_current_user_id(), 'me_sponsorship_access_post_ids', true)
+    : [];
+$granted_post_ids = is_array($granted_post_ids) ? array_map('intval', $granted_post_ids) : [];
+$granted_post_dates = is_user_logged_in()
+    ? get_user_meta(get_current_user_id(), 'me_sponsorship_access_post_dates', true)
+    : [];
+$granted_post_dates = is_array($granted_post_dates) ? $granted_post_dates : [];
+
+foreach ($granted_post_ids as $granted_post_id) {
+    $granted_post = get_post($granted_post_id);
+    if (! $granted_post || $granted_post->post_status !== 'publish') {
+        continue;
+    }
+
+    $granted_post->last_purchase_date = $granted_post_dates[$granted_post_id] ?? current_time('mysql');
+    $purchased[] = $granted_post;
+}
+
+$purchased = array_values(array_reduce($purchased, static function (array $posts, $post): array {
+    $posts[$post->ID] = $post;
+
+    return $posts;
+}, []));
+
+$render_upsell = static function (): void {
+    $product_template = (int) get_field('pay_per_post_product_template', 'option');
+    if (! $product_template || ! did_action('elementor/loaded')) {
+        return;
+    }
+    (new ElementorCssPost($product_template))->enqueue();
+    echo ElementorPlugin::instance()->frontend->get_builder_content_for_display($product_template);
+};
+
+$posts = array_filter($purchased, function ($post) use (
+    $private_gallery_post_tag,
+    $bts_post_tag,
+    $page_id,
+    $purchased_page_id,
+    $exclusive_page_id,
+    $lang
+) {
+    $id = $post->ID;
+
+    $language_info = apply_filters('wpml_post_language_details', null, $id);
+    $language_code = $language_info['language_code'] ?? 'en';
+    if ($language_code !== $lang) {
+        return false;
+    }
+
+    $is_exclusive_content = has_term($private_gallery_post_tag, 'post_tag', $id)
+        || has_term($bts_post_tag, 'post_tag', $id);
+
+    if ($page_id === $purchased_page_id) {
+        return ! $is_exclusive_content;
+    }
+    if ($page_id === $exclusive_page_id) {
+        return $is_exclusive_content;
+    }
+
+    return true;
+});
+
+usort($posts, static fn ($a, $b) => strcmp($b->last_purchase_date ?? '', $a->last_purchase_date ?? ''));
 ?>
 <div class="mm-purchased">
-    <?php
-    if (count($purchased) > 0):
-        $page_id = get_the_ID();
-        $posts = array_filter($purchased, function ($post) use ($private_gallery_post_tag, $bts_post_tag, $page_id,
-            $field_purchased_page, $field_exclusive_content_page) {
-            $id = (is_int($post)) ? $post : $post->ID;
-            $language_info = apply_filters('wpml_post_language_details', null, $id);
-            if ($language_info) {
-                $language_code = $language_info['language_code'];
+    <?php if ($posts) { ?>
+        <h3>
+            <?php if ($page_id === $exclusive_page_id) {
+                esc_html_e('Exclusive Content', APP_THEME_DOMAIN);
             } else {
-                $language_code = 'en';
-            }
-            $current_language = apply_filters('wpml_current_language', NULL);
-            if($language_code !== $current_language) {
-                return false;
-            }
-            if($page_id === (int)$field_purchased_page) {
-                if ( has_term($private_gallery_post_tag, 'post_tag', $id) ||
-                    has_term($bts_post_tag, 'post_tag', $id) ) {
-                    return false;
-                }
-            } else if($page_id === (int)$field_exclusive_content_page) {
-                if ( !has_term($private_gallery_post_tag, 'post_tag', $id) &&
-                    !has_term($bts_post_tag, 'post_tag', $id) ) {
-                    return false;
-                }
-            }
-            return true;
-        });
-      $classname = $posts ? 'mm-purchased__list' : ''; ?>
-      <h3>
-          <?php _e(
-              sprintf('%s Content', $field_exclusive_content_page === $page_id ? 'Exclusive' : 'Purchased'),
-              APP_THEME_DOMAIN
-          ); ?>
-      </h3>
-      <div class='<?php echo $classname;?>'>
-          <?php
-          if ($posts):
-              foreach ($posts as $post):
-                  $permalink = get_permalink($post->ID); ?>
-                <div class='mm-purchased__list__item <?php
-                echo get_post_type($post->ID); ?>'>
-                    <?php
-                    $post_thumbnail = get_the_post_thumbnail_url($post->ID); ?>
-                  <div class='thumbnail' style='background-image: url(<?php
-                  echo $post_thumbnail ?>);'>
-                  </div>
-                  <div class='info'>
-                    <a href="<?php
-                    echo $permalink; ?>">
-                        <?php
-                        echo esc_html($post->post_title); ?>
-                    </a>
-                  </div>
+                esc_html_e('Purchased Content', APP_THEME_DOMAIN);
+            } ?>
+        </h3>
+        <div class="mm-purchased__list">
+            <?php foreach ($posts as $post) {
+                $permalink = get_permalink($post->ID);
+                $post_thumbnail = get_the_post_thumbnail_url($post->ID);
+                ?>
+                <div class="mm-purchased__list__item <?php echo esc_attr(get_post_type($post->ID)); ?>">
+                    <div class="thumbnail" style="background-image: url(<?php echo esc_url($post_thumbnail); ?>);"></div>
+                    <div class="info">
+                        <a href="<?php echo esc_url($permalink); ?>">
+                            <?php echo esc_html($post->post_title); ?>
+                        </a>
+                    </div>
                 </div>
-              <?php
-              endforeach;
-          else:
-              $product_template = get_field('pay_per_post_product_template', 'option');
-              if ($product_template && did_action('elementor/loaded')) {
-//                echo Plugin::instance()->frontend->get_builder_content_for_display($product_template);
-              }?>
-          <?php endif; ?>
-      </div>
-    <?php
-    else:
-        $product_template = get_field('pay_per_post_product_template', 'option');
-        if ($product_template && did_action('elementor/loaded')) {
-//            echo Plugin::instance()->frontend->get_builder_content_for_display($product_template);
-        }?>
-    <?php
-    endif;
-    ?>
+            <?php } ?>
+        </div>
+    <?php } else {
+        $render_upsell();
+    } ?>
 </div>
