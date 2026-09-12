@@ -5,10 +5,21 @@
 use Elementor\Core\Files\CSS\Post as ElementorCssPost;
 use Elementor\Plugin as ElementorPlugin;
 
-$private_gallery_post_tag = get_field('private_gallery_post_tag', 'option');
-$bts_post_tag = get_field('bts_post_tag', 'option');
-
 $lang = apply_filters('wpml_current_language', null);
+$private_gallery_post_tag = (int) apply_filters(
+    'wpml_object_id',
+    (int) get_field('private_gallery_post_tag', 'option'),
+    'post_tag',
+    true,
+    $lang
+);
+$bts_post_tag = (int) apply_filters(
+    'wpml_object_id',
+    (int) get_field('bts_post_tag', 'option'),
+    'post_tag',
+    true,
+    $lang
+);
 $purchased_page_id = (int) apply_filters(
     'wpml_object_id',
     (int) get_field('field_purchased_page', 'option'),
@@ -25,6 +36,31 @@ $exclusive_page_id = (int) apply_filters(
 );
 
 $page_id = get_the_ID();
+
+$granted_post_ids = is_user_logged_in()
+    ? get_user_meta(get_current_user_id(), 'me_sponsorship_access_post_ids', true)
+    : [];
+$granted_post_ids = is_array($granted_post_ids) ? array_map('intval', $granted_post_ids) : [];
+$granted_post_dates = is_user_logged_in()
+    ? get_user_meta(get_current_user_id(), 'me_sponsorship_access_post_dates', true)
+    : [];
+$granted_post_dates = is_array($granted_post_dates) ? $granted_post_dates : [];
+
+foreach ($granted_post_ids as $granted_post_id) {
+    $granted_post = get_post($granted_post_id);
+    if (! $granted_post || $granted_post->post_status !== 'publish') {
+        continue;
+    }
+
+    $granted_post->last_purchase_date = $granted_post_dates[$granted_post_id] ?? current_time('mysql');
+    $purchased[] = $granted_post;
+}
+
+$purchased = array_values(array_reduce($purchased, static function (array $posts, $post): array {
+    $posts[$post->ID] = $post;
+
+    return $posts;
+}, []));
 
 $render_upsell = static function (): void {
     $product_template = (int) get_field('pay_per_post_product_template', 'option');
